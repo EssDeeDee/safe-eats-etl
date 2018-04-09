@@ -11,25 +11,6 @@ from flask import Flask, request
 # ****************************** To Do List ******************************
 
 
-#  Define server
-app = Flask(__name__)
-
-
-# App routes
-@app.route("/ping")
-def ping_route():
-    return "Ping! Service is available."
-
-
-@app.route("/scores")
-def return_report():
-    b_date = request.args.get('b')
-    e_date = request.args.get('e')
-    dates_query = "?BegDate=" + str(b_date) + "&EndDate=" + str(e_date)
-
-    return fetch_scores(dates_query)
-
-
 def fetch_scores(dates):
     """Fetch scores given beginning and end dates as parameters
     Input(s):
@@ -49,23 +30,72 @@ def fetch_scores(dates):
     r = requests.get(url_query)
     print(r.status_code)
 
-    soup = BeautifulSoup(r.text, 'html.parser')
+    return r.text
+
+
+def parse_scores(input_html):
+    """Parse input_html using BeautifulSoup
+    Input(s):
+      - input_html: HTML returned from the food inspection website
+
+    Output(s):
+      - score_data: parsed JSON score data"""
+
+    low_score_flag = 0
+
+    soup = BeautifulSoup(input_html, 'html.parser')
     # print(soup.prettify())
 
     # print(soup.title)
-    sections = soup.find_all('p')
-    print(sections)
+    main_sections = soup.find_all('p')
+    # print(sections)
     sections2 = soup.select('p .style1')
-    print(sections2)
+    # print(sections2)
 
-    for section in sections:
-        for content in section.stripped_strings:
-            print(content, type(content))
-            # print(str(content))
-        print("---------------------")
+    for section in main_sections:
+        # for content in section.stripped_strings:
+        #     print(content, type(content))
+        #     # print(str(content))
+        content = section.stripped_strings
+        name = str(next(content))
+        if low_score_flag == 0 and name != "Low Scores:":
+            address = str(next(content))
+            inspection_date = str(next(content))
+            score = str(next(content))
 
-    return r.text
+            print("Name: ", name)
+            print("Score: ", score)
+            print("---------------------")
+        elif name == "Low Scores:":
+            low_score_flag = 1
+        else:
+            if name == "There are no updates available for the date range you selected.":
+                break
+            print("Process low scores here, please!")
+
+    return input_html
     # print(soup.find_all('p'))
+
+
+#  Define server
+app = Flask(__name__)
+
+
+# App routes
+@app.route("/ping")
+def ping_route():
+    return "Ping! Service is available."
+
+
+@app.route("/scores")
+def return_report():
+    b_date = request.args.get('from')
+    e_date = request.args.get('to')
+    dates_query = "?BegDate=" + str(b_date) + "&EndDate=" + str(e_date)
+
+    html_scores = fetch_scores(dates_query)
+
+    return parse_scores(html_scores)
 
 
 # Main
